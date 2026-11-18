@@ -1,0 +1,18 @@
+const assert = require('node:assert/strict');
+const {audit} = require('./checker.js');
+const source = {id: 'policy', text: 'Refunds are available within 14 days. The fee is 2.5 percent.'};
+const run = (text, citations, sources = [source]) => audit({sources, claims: [{text, citations}]}).rows[0];
+assert.equal(run('Refunds within 14 days', ['policy']).status, 'contract-pass');
+assert.match(run('Refunds within 30 days', ['policy']).flags[0], /30/);
+assert.match(run('Refunds available', []).flags[0], /No citations/);
+assert.match(run('Refunds available', ['missing']).flags[0], /Unknown/);
+assert.equal(run('Fee 2.5 percent', ['policy']).status, 'contract-pass');
+assert.equal(run('Fee 2.50 percent', ['policy']).status, 'review');
+assert.equal(run('14 days', ['policy', 'policy']).citations.length, 1);
+assert.equal(run('Policy', ['empty'], [{id: 'empty', text: ''}]).status, 'review');
+assert.throws(() => audit({sources: [source, source], claims: []}), /unique/);
+assert.throws(() => audit({sources: [], claims: [{text: '', citations: []}]}), /claim/);
+assert.throws(() => audit({sources: [], claims: [{text: 'x', citations: [3]}]}), /strings/);
+assert.equal(audit({sources: [], claims: []}).total, 0);
+assert.equal(run('No refunds are available', ['policy']).status, 'contract-pass');
+console.log('13 checks passed. Contract pass is not a semantic correctness verdict.');
